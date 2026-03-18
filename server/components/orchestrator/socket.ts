@@ -1,5 +1,5 @@
 import { WebSocketServer } from "ws";
-import type { WebSocket } from "ws";
+import type { RawData, WebSocket } from "ws";
 import type { Request } from "express";
 import logger, { logWst } from "../../utils/log";
 import expressSession from "express-session";
@@ -367,7 +367,7 @@ async function onConnection(
 
     void initializeSocket(send, type, req.session as unknown as AppSession);
     ws.on("error", logger.error);
-    ws.on("message", async (data) => {
+    ws.on("message", async (data: RawData) => {
       void onMessage(
         send,
         req.session as unknown as AppSession,

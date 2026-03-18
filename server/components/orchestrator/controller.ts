@@ -1,5 +1,5 @@
 import logger from "../../utils/log";
-import { llm, embedText } from "../../services/ai/ai";
+import { embedText, getEmbeddingDimensions } from "../../services/ai/ai";
 import config from "../../config";
 import getClient from "../../redis";
 import { WorkingMemoryModel } from "../memory";
@@ -17,7 +17,7 @@ async function getWorkingMemory(userId: string) {
 
   return WorkingMemoryModel.New(redis, userId, {
     createUid: randomUlid,
-    vectorDimensions: llm.dimensions,
+    vectorDimensions: getEmbeddingDimensions(),
     embed: embedText,
     ttl: config.redis.DEFAULT_TTL,
   });
@@ -91,7 +91,7 @@ export async function newProject(
     send(
       view.renderInstructions({
         instructions:
-          "Start by entering a project title and prompt, then you can get to work!",
+          "Add a title and a working brief. In local demo mode, the app loads bundled docs into Redis so you can start exploring right away.",
       }),
     );
 
@@ -137,7 +137,7 @@ export async function switchProject(
     send(
       view.renderInstructions({
         instructions:
-          "Start by entering a project title and prompt, then you can get to work!",
+          "Add a title and a working brief. In local demo mode, the app loads bundled docs into Redis so you can start exploring right away.",
       }),
     );
 
@@ -162,7 +162,7 @@ export async function startProject(
 ) {
   send(
     view.renderInstructions({
-      instructions: "Kicking off project...",
+      instructions: "Loading your Redis document workspace...",
       progress: true,
     }),
   );
@@ -218,12 +218,17 @@ export async function crawlPages(
   const { url, instructions } = await parser.extractUrlAndInstructions(prompt);
 
   let docs: Document[] = [];
-  if (url && instructions) {
+  if (config.crawl.SOURCE === "local" || (url && instructions)) {
     logger.info(`Extracted instructions=[${instructions}] and url=[${url}]`, {
       userId,
     });
 
-    docs = await crawler.crawlUrl(userId, projectId, url, instructions);
+    docs = await crawler.crawlUrl(
+      userId,
+      projectId,
+      url ?? "",
+      instructions ?? "",
+    );
 
     docs.sort((a, b) => a.url.localeCompare(b.url));
 

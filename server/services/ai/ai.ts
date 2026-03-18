@@ -5,10 +5,34 @@ import type { LanguageModelV2, EmbeddingModelV2 } from "@ai-sdk/provider";
 import { embed } from "ai";
 import config from "../../config";
 
+export interface LlmConfig {
+  largeModel: LanguageModelV2;
+  mediumModel: LanguageModelV2;
+  smallModel: LanguageModelV2;
+  embeddings: EmbeddingModelV2<string>;
+  dimensions: number;
+}
+
+interface TestEmbeddingConfig {
+  dimensions: number;
+  embedText(text: string): Promise<number[]>;
+}
+
 /**
- * Returns the configured LLM based on the environment settings.
+ * Returns whether a model provider is configured.
  */
-function getLlm() {
+export function hasConfiguredLlm(): boolean {
+  return Boolean(
+    config.anthropic.API_KEY ||
+      config.openai.API_KEY ||
+      config.google.CREDENTIALS,
+  );
+}
+
+/**
+ * Creates the configured LLM based on the environment settings.
+ */
+function createLlm(): LlmConfig {
   let largeModel: LanguageModelV2 | null = null;
   let mediumModel: LanguageModelV2 | null = null;
   let smallModel: LanguageModelV2 | null = null;
@@ -71,16 +95,46 @@ function getLlm() {
   };
 }
 
+let llmCache: LlmConfig | undefined;
+let testEmbeddingConfig: TestEmbeddingConfig | undefined;
+
+/**
+ * Returns the configured LLM when a model-backed code path is executed.
+ */
+export function getLlm(): LlmConfig {
+  if (!llmCache) {
+    llmCache = createLlm();
+  }
+
+  return llmCache;
+}
+
+/**
+ * Allows tests to bypass live embedding providers.
+ */
+export function setTestEmbeddingConfig(config?: TestEmbeddingConfig) {
+  testEmbeddingConfig = config;
+}
+
+/**
+ * Returns the active embedding dimension count.
+ */
+export function getEmbeddingDimensions(): number {
+  return testEmbeddingConfig?.dimensions ?? getLlm().dimensions;
+}
+
 /**
  * Generates an embedding for the provided text using the configured LLM embeddings model.
  */
 export async function embedText(text: string): Promise<number[]> {
+  if (testEmbeddingConfig) {
+    return testEmbeddingConfig.embedText(text);
+  }
+
   const { embedding } = await embed({
-    model: llm.embeddings,
+    model: getLlm().embeddings,
     value: text,
   });
 
   return embedding;
 }
-
-export const llm = getLlm();

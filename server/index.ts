@@ -3,12 +3,13 @@ import app, { initialize } from "./app";
 import logger, { logWss } from "./utils/log";
 import { IncomingMessage } from "http";
 import { Duplex } from "stream";
+import type { WebSocket } from "ws";
 import { socket as orchestrator } from "./components/orchestrator";
 
 const port = config.env.PORT;
 
 const server = app.listen(port, async () => {
-  logger.info(`Redis chat server listening on port ${port}`, {
+  logger.info(`Redis document agent listening on port ${port}`, {
     noStream: true,
   });
 
@@ -30,17 +31,17 @@ async function onUpgrade(
   switch (url) {
     case "/chat":
       orchestrator.wss.handleUpgrade(req, socket, head, (ws) => {
-        orchestrator.wss.emit("connection", ws, req, "chat");
+        orchestrator.wss.emit("connection", ws as WebSocket, req, "chat");
       });
       break;
     case "/projects":
       orchestrator.wss.handleUpgrade(req, socket, head, (ws) => {
-        orchestrator.wss.emit("connection", ws, req, "projects");
+        orchestrator.wss.emit("connection", ws as WebSocket, req, "projects");
       });
       break;
     case "/log":
       logWss.handleUpgrade(req, socket, head, (ws) => {
-        logWss.emit("connection", ws, req);
+        logWss.emit("connection", ws as WebSocket, req);
       });
       break;
     default:

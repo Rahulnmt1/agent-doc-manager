@@ -1,12 +1,21 @@
 import { tavily } from "@tavily/core";
 import config from "../../config";
 
-const tvly = tavily({
-  apiKey: config.tavily.API_KEY,
-});
+function getClient() {
+  if (!config.tavily.API_KEY) {
+    throw new Error(
+      "No Tavily API key configured. Set TAVILY_API_KEY to enable live crawl mode.",
+    );
+  }
+
+  return tavily({
+    apiKey: config.tavily.API_KEY,
+  });
+}
 
 export async function extract(urls: string[]) {
   const chunkSize = 20;
+  const client = getClient();
 
   if (urls.length > chunkSize) {
     const chunks = [];
@@ -16,7 +25,7 @@ export async function extract(urls: string[]) {
 
     const results = [];
     for (const chunk of chunks) {
-      const res = await tvly.extract(chunk, {
+      const res = await client.extract(chunk, {
         format: "markdown",
       });
       results.push(...res.results);
@@ -25,14 +34,14 @@ export async function extract(urls: string[]) {
     return { results };
   }
 
-  return tvly.extract(urls, {
+  return client.extract(urls, {
     format: "markdown",
   });
 }
 
 export async function crawl(url: string, instructions: string) {
-  const response = await tvly.crawl(url, {
-    // instructions: `Find all the pages listed under "HowTos & Tutorials"`,
+  const client = getClient();
+  const response = await client.crawl(url, {
     instructions,
     format: "markdown",
     limit: 3,

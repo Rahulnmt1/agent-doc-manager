@@ -1,4 +1,55 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap");
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Space Grotesk", sans-serif;
+  --font-mono: "Space Mono", monospace;
+
+  --color-midnight: #091A23;
+  --color-dusk: #163341;
+  --color-dusk-01: #F3F3F3;
+  --color-dusk-09: #0D212C;
+  --color-dusk-90: #2D4754;
+  --color-dusk-50: #8A99A0;
+  --color-dusk-30: #B9C2C6;
+  --color-dusk-10: #D9D9D9;
+
+  --color-hyper-04: #FD736A;
+  --color-hyper-05: #FF4438;
+  --color-hyper-06: #EB352A;
+  --color-hyper-07: #E4291E;
+  --color-hyper-08: #D1281E;
+  --color-hyper-09: #8A221C;
+  --color-hyper-10: #351D22;
+
+  --color-volt: #DCFF1E;
+  --color-volt-50: #F1FFA5;
+}
+
+:root {
+  --primary-font: "Space Grotesk", sans-serif;
+  --secondary-font: "Space Mono", monospace;
+
+  --primary-color: #FF4438;
+  --midnight: #091A23;
+  --yellow: #DCFF1E;
+  --base-white: #FFFFFF;
+  --base-black: #000000;
+
+  --bg-default: var(--midnight);
+  --fg-default: var(--base-white);
+  --fg-body: #D9D9D9;
+  --fg-muted: #B9C2C6;
+  --fg-brand: var(--yellow);
+  --border: #163341;
+  --stroke-divider: #8A99A0;
+}
+
+html {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
 progress {
   border: revert;
@@ -12,21 +63,91 @@ button {
   opacity: 0.5;
 }
 
-/* Add markdown-specific styling here */
+.btn-primary {
+  background-color: #351D22;
+  border: 1px solid #FF4438;
+  color: #FFFFFF;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 200px;
+  padding: 0.625rem 1.5rem;
+  transition: background-color 150ms, border-color 150ms;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  background-color: #8A221C;
+  border-color: #EB352A;
+}
+.btn-primary:active {
+  background-color: #8A221C;
+  border-color: #EB352A;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-secondary {
+  background-color: #163341;
+  border: 1px solid #2D4754;
+  color: #FFFFFF;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 200px;
+  padding: 0.625rem 1.5rem;
+  transition: background-color 150ms, border-color 150ms;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background-color: #2D4754;
+}
+.btn-secondary:active {
+  background-color: #2D4754;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #351D22;
+  border: 1px solid #FF4438;
+  color: #FFFFFF;
+  border-radius: 9999px;
+  width: 2.25rem;
+  height: 2.25rem;
+  transition: background-color 150ms, border-color 150ms;
+  cursor: pointer;
+}
+.btn-icon:hover {
+  background-color: #8A221C;
+  border-color: #EB352A;
+}
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .markdown {
+  color: #D9D9D9;
+
   h1 {
     font-size: 2rem;
     margin-bottom: 0.5rem;
+    color: #FFFFFF;
   }
 
   h2 {
     font-size: 1.75rem;
     margin-bottom: 0.5rem;
+    color: #FFFFFF;
   }
 
   h3 {
     font-size: 1.5rem;
     margin-bottom: 0.5rem;
+    color: #FFFFFF;
   }
 
   p {
@@ -44,23 +165,35 @@ button {
   }
 
   blockquote {
-    border-left: 4px solid #ccc;
+    border-left: 4px solid #8A99A0;
     padding-left: 1rem;
     margin: 1rem 0;
+    color: #B9C2C6;
   }
+
   code {
-    background-color: #f5f5f5;
+    background-color: #2D4754;
     padding: 0.2rem 0.4rem;
     border-radius: 3px;
+    font-family: "Space Mono", monospace;
+    color: #DCFF1E;
   }
 
   pre {
-    background-color: #f5f5f5;
+    background-color: #0D212C;
+    border: 1px solid #163341;
     padding: 1rem;
-    border-radius: 3px;
+    border-radius: 5px;
     overflow-x: auto;
     font-size: 0.875rem;
+
+    code {
+      background-color: transparent;
+      padding: 0;
+      color: #D9D9D9;
+    }
   }
+
   img {
     max-width: 100%;
     height: auto;
@@ -74,38 +207,50 @@ button {
 
   th,
   td {
-    border: 1px solid #ddd;
+    border: 1px solid #2D4754;
     padding: 0.5rem;
   }
+
   th {
-    background-color: #f2f2f2;
+    background-color: #163341;
+    color: #FFFFFF;
   }
+
   a {
-    color: #1a0dab;
+    color: #FD736A;
     text-decoration: none;
   }
+
   a:hover {
     text-decoration: underline;
+    color: #FF4438;
   }
+
   hr {
     border: none;
-    border-top: 1px solid #ccc;
+    border-top: 1px solid #2D4754;
     margin: 1rem 0;
   }
+
   strong {
     font-weight: bold;
+    color: #FFFFFF;
   }
-  rem {
+
+  em {
     font-style: italic;
   }
+
   small {
     font-size: 0.875rem;
-    color: #666;
+    color: #8A99A0;
   }
+
   sub {
     font-size: 0.75rem;
     vertical-align: sub;
   }
+
   sup {
     font-size: 0.75rem;
     vertical-align: super;

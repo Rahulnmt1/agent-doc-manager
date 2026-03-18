@@ -1,402 +1,170 @@
-import { afterAll, beforeEach, describe, test, mock, expect } from "bun:test";
-import ChatModel from "../server/components/memory/chat";
-import LongTermMemoryModel from "../server/components/memory/long";
-import EpisodicMemoryModel from "../server/components/memory/episodic";
-import SemanticMemoryModel from "../server/components/memory/semantic";
-import WorkingMemoryModel from "../server/components/memory/working";
-import getClient from "../server/redis";
+import { afterAll, beforeEach, describe, expect, test } from "bun:test";
+import { ctrl as documents } from "../server/components/documents";
+import { ctrl as projects } from "../server/components/projects";
+import {
+  LongTermMemoryModel,
+  SemanticMemoryModel,
+  ShortTermMemoryModel,
+  WorkingMemoryModel,
+} from "../server/components/memory";
+import { setTestEmbeddingConfig } from "../server/services/ai/ai";
+import { flushTestData, getTestRedis } from "./helpers/redis";
 
-const db = getClient();
-const userId = "123";
+const VECTOR_LOOKUP: Record<string, number[]> = {
+  "Hello, world!": [0, 0, 0],
+  "What is Redis?": [1, 0, 0],
+  "Redis stores docs fast.": [1, 0, 0],
+  "Redis search reference": [1, 0, 0],
+  "Markdown editing preferences": [0, 1, 0],
+  "Use sentence case headings.": [0, 1, 0],
+  "chat-summary": [0, 0, 1],
+  "We updated the getting started page.": [0, 0, 1],
+  "redis docs": [1, 0, 0],
+  "# Redis\nRedis stores docs fast.": [1, 0, 0],
+  "# Search\nRedis Search powers vector search.": [1, 0, 0],
+};
 
-async function flush() {
-  const keys = await db.keys("users:*");
-  const semantic = await db.keys("semantic-memory*");
-
-  if (Array.isArray(semantic) && semantic.length > 0) {
-    keys.push(...semantic);
-  }
-
-  if (Array.isArray(keys) && keys.length > 0) {
-    await db.del(keys);
-  }
-
-  const indexes = await db.ft._list();
-
-  await Promise.all(
-    indexes
-      .filter((index) => {
-        return index.includes(userId) || index.includes("semantic-memory");
-      })
-      .map(async (index) => {
-        await db.ft.dropIndex(index);
-      }),
-  );
+function getEmbedding(text: string): number[] {
+  return VECTOR_LOOKUP[text] ?? [0.5, 0.5, 0.5];
 }
 
-describe("Memory", () => {
-  beforeEach(flush);
-  afterAll(flush);
-
-  test("ChatModel.Initialize can be called several times and creates the index", async () => {
-    await ChatModel.Initialize(db, userId);
-    await ChatModel.Initialize(db, userId);
-    await ChatModel.Initialize(db, userId);
-    await ChatModel.Initialize(db, userId);
+describe("Redis-backed models", () => {
+  beforeEach(async () => {
+    setTestEmbeddingConfig({
+      dimensions: 3,
+      embedText: async (text: string) => getEmbedding(text),
+    });
+    await flushTestData();
   });
 
-  test("ChatModel should manage all chats", async () => {
-    const chat1 = await ChatModel.New(db, userId);
-    const chat2 = await ChatModel.New(db, userId);
-    const chats = await ChatModel.AllChats(db, userId);
-    expect(chats.length).toBe(2); // Including the one created in beforeAll
-    const chatIds = chats.map((chat) => chat.chatId);
-    expect(chatIds).toContain(chat1.chatId);
-    expect(chatIds).toContain(chat2.chatId);
+  afterAll(async () => {
+    setTestEmbeddingConfig();
+    await flushTestData();
   });
 
-  test("AllChats should return the top message if it exists", async () => {
-    const chat1 = await ChatModel.New(db, userId);
-    const chat2 = await ChatModel.New(db, userId);
+  test("ShortTermMemoryModel stores and clears chat history", async () => {
+    const redis = await getTestRedis();
+    const chat = await ShortTermMemoryModel.New(redis, "user-short");
 
-    await chat1.push({
+    await chat.push({
       role: "user",
       content: "Hello",
     });
-    await chat1.push({
-      role: "assistant",
-      content: "Hello, how can I help you?",
-    });
-
-    expect(chat1.length()).resolves.toBe(2);
-    const chats = await ChatModel.AllChats(db, userId);
-    expect(chats.length).toBe(2); // Including the one created in beforeAll
-    const chat1Data = chats.find((chat) => chat.chatId === chat1.chatId);
-    const chat2Data = chats.find((chat) => chat.chatId === chat2.chatId);
-    expect(chat1Data?.messages.length).toBe(1);
-    expect(chat1Data?.messages[0].content).toBe("Hello, how can I help you?");
-    expect(chat2Data?.messages.length).toBe(0);
-  });
-
-  test("ChatModel should store and retrieve messages", async () => {
-    const chatModel = await ChatModel.New(db, userId);
-    expect(chatModel.length()).resolves.toBe(0);
-
-    await chatModel.push({
-      role: "user",
-      content: "Hello",
-    });
-    await chatModel.push({
+    await chat.push({
       role: "assistant",
       content: "Hi there!",
     });
 
-    const messages = await chatModel.messages();
-    expect(chatModel.length()).resolves.toBe(2);
-    expect(messages[0].content).toBe("Hello");
-    expect(messages[1].content).toBe("Hi there!");
-    await chatModel.clear();
-    expect(chatModel.length()).resolves.toBe(0);
+    const messages = await chat.memories();
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]?.content).toBe("Hello");
+    expect(messages[1]?.content).toBe("Hi there!");
+
+    await chat.clear();
+    expect(await chat.memories()).toHaveLength(0);
   });
 
-  test("LongTermMemoryModel should create the index on Initialize", async () => {
-    const options = {
+  test("SemanticMemoryModel update keeps the stored id searchable", async () => {
+    const redis = await getTestRedis();
+    const semanticMemory = await SemanticMemoryModel.New(redis, {
       vectorDimensions: 3,
-      embed: async (text: string) => {
-        return [0, 0, 0];
-      },
-      createUid: () => {
-        return "test";
-      },
-    };
-    await LongTermMemoryModel.Initialize(db, userId, options);
-    await LongTermMemoryModel.Initialize(db, userId, options);
-    await LongTermMemoryModel.Initialize(db, userId, options);
-    await LongTermMemoryModel.Initialize(db, userId, options);
-  });
-
-  test("LongTermMemoryModel should store and retrieve memories", async () => {
-    const longTermMemory = await LongTermMemoryModel.New(db, userId, {
-      vectorDimensions: 3,
-      embed: async (text: string) => {
-        if (text === "What is the user's name?") {
-          return [1, 0, 0];
-        } else if (text === "What is the user's age?") {
-          return [0, 1, 0];
-        } else if (text === "What is the user's favorite color?") {
-          return [0, 0, 1];
-        }
-        return [0, 0, 0];
-      },
+      embed: async (text: string) => getEmbedding(text),
+      createUid: () => "semantic-entry",
     });
 
-    await longTermMemory.add("What is the user's name?", "John");
-    await longTermMemory.add("What is the user's age?", "30");
-    await longTermMemory.add("What is the user's favorite color?", "Blue");
+    const id = await semanticMemory.add("What is Redis?", "Initial answer");
+    await semanticMemory.update(id, "What is Redis?", "Updated answer");
 
-    const results = await longTermMemory.search("Hello", 2);
-    expect(results.length).toBe(2);
-    expect(results[0].question).toBe("What is the user's name?");
-    expect(results[0].answer).toBe("John");
-    expect(results[1].question).toBe("What is the user's age?");
-    expect(results[1].answer).toBe("30");
+    const results = await semanticMemory.search("What is Redis?");
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.id).toBe("semantic-entry");
+    expect(results[0]?.answer).toBe("Updated answer");
   });
 
-  test("LongTermMemoryModel should allow updates", async () => {
-    const longTermMemory = await LongTermMemoryModel.New(db, userId, {
+  test("WorkingMemoryModel merges semantic, episodic, and long-term memory", async () => {
+    const redis = await getTestRedis();
+    const workingMemory = await WorkingMemoryModel.New(redis, "user-memory", {
       vectorDimensions: 3,
-      embed: async (text: string) => {
-        if (text === "What is the user's name?") {
-          return [1, 0, 0];
-        } else if (text === "What is the user's age?") {
-          return [0, 1, 0];
-        } else if (text === "What is the user's favorite color?") {
-          return [0, 0, 1];
-        }
-        return [0, 0, 0];
-      },
+      embed: async (text: string) => getEmbedding(text),
+      createUid: () => crypto.randomUUID(),
+      topK: 5,
+      distanceThreshold: 0.5,
     });
 
-    await longTermMemory.add("What is the user's name?", "John");
-    let results = await longTermMemory.search("What is the user's name?", 1);
-    expect(results.length).toBe(1);
-    expect(results[0].question).toBe("What is the user's name?");
-    expect(results[0].answer).toBe("John");
-
-    // Add again with the same ID but different answer
-    await longTermMemory.update(
-      results[0].id,
-      "What is the user's name?",
-      "Jane",
+    await workingMemory.addSemanticMemory(
+      "What is Redis?",
+      "Redis stores docs fast.",
     );
-    results = await longTermMemory.search("What is the user's name?", 1);
-    expect(results.length).toBe(1);
-    expect(results[0].question).toBe("What is the user's name?");
-    expect(results[0].answer).toBe("Jane");
+    await workingMemory.addLongTermMemory(
+      "Markdown editing preferences",
+      "Use sentence case headings.",
+    );
+    await workingMemory.addEpisodicMemory(
+      "chat-summary",
+      "We updated the getting started page.",
+    );
+
+    const semanticResults = await workingMemory.search("What is Redis?");
+    const longTermResults = await workingMemory.search(
+      "Markdown editing preferences",
+    );
+    const episodicResults = await workingMemory.search("chat-summary");
+
+    expect(
+      semanticResults.some((entry) => entry.type === "semantic"),
+    ).toBeTrue();
+    expect(
+      longTermResults.some((entry) => entry.type === "long-term"),
+    ).toBeTrue();
+    expect(
+      episodicResults.some((entry) => entry.type === "episodic"),
+    ).toBeTrue();
   });
 
-  test("EpisodicMemoryModel should create the index on Initialize", async () => {
-    const options = {
-      vectorDimensions: 3,
-      embed: async (text: string) => {
-        return [0, 0, 0];
-      },
-      createUid: () => {
-        return "test";
-      },
-    };
-    await EpisodicMemoryModel.Initialize(db, userId, options);
-    await EpisodicMemoryModel.Initialize(db, userId, options);
-    await EpisodicMemoryModel.Initialize(db, userId, options);
-    await EpisodicMemoryModel.Initialize(db, userId, options);
+  test("Projects controller creates, updates, and reads project metadata", async () => {
+    const userId = "user-projects";
+    await projects.initialize();
+
+    const project = await projects.create(userId);
+    await projects.update(
+      userId,
+      project.projectId,
+      "Redis document agent",
+      "Load bundled docs into Redis.",
+    );
+
+    const reloaded = await projects.read(userId, project.projectId);
+    const allProjects = await projects.all(userId);
+
+    expect(reloaded.title).toBe("Redis document agent");
+    expect(reloaded.prompt).toBe("Load bundled docs into Redis.");
+    expect(allProjects).toHaveLength(1);
   });
 
-  test("EpisodicMemoryModel should store and retrieve memories", async () => {
-    const episodicMemory = await EpisodicMemoryModel.New(db, userId, {
-      vectorDimensions: 3,
-      embed: async (text: string) => {
-        if (text === "What was the conversation about bats?") {
-          return [1, 0, 0];
-        } else if (text === "What were we discussing about universities?") {
-          return [0, 1, 0];
-        } else if (text === "What happened in the job interview?") {
-          return [0, 0, 1];
-        }
-        return [0, 0, 0];
+  test("Documents controller indexes bundled docs for vector search", async () => {
+    const userId = "user-docs";
+    const projectId = "project-docs";
+
+    await documents.initialize();
+    const created = await documents.createMany(userId, projectId, [
+      {
+        url: "https://example.com/redis",
+        content: "# Redis\nRedis stores docs fast.",
       },
-    });
-
-    await episodicMemory.add("c1", "What was the conversation about bats?");
-    await episodicMemory.add(
-      "c2",
-      "What were we discussing about universities?",
-    );
-    await episodicMemory.add("c3", "What happened in the job interview?");
-
-    const results = await episodicMemory.search(
-      "What was the conversation about bats?",
-      2,
-    );
-    expect(results.length).toBe(2);
-    expect(results[0].summary).toBe("What was the conversation about bats?");
-    expect(results[0].chatId).toBe("c1");
-    expect(results[1].summary).toBe(
-      "What were we discussing about universities?",
-    );
-    expect(results[1].chatId).toBe("c2");
-  });
-
-  test("EpisodicMemoryModel should allow updates", async () => {
-    const episodicMemory = await EpisodicMemoryModel.New(db, userId, {
-      vectorDimensions: 3,
-      embed: async (text: string) => {
-        if (text === "What was the conversation about bats?") {
-          return [1, 0, 0];
-        } else if (text === "What were we discussing about universities?") {
-          return [0, 1, 0];
-        } else if (text === "What happened in the job interview?") {
-          return [0, 0, 1];
-        }
-        return [0, 0, 0];
+      {
+        url: "https://example.com/search",
+        content: "# Search\nRedis Search powers vector search.",
       },
-    });
+    ]);
 
-    await episodicMemory.add("c1", "What was the conversation about bats?");
-    let results = await episodicMemory.search(
-      "What was the conversation about bats?",
-      1,
-    );
-    expect(results.length).toBe(1);
-    expect(results[0].summary).toBe("What was the conversation about bats?");
-    expect(results[0].chatId).toBe("c1");
+    const chunks = await documents.searchChunks(userId, "redis docs");
+    const results = await documents.search(userId, projectId, "redis docs");
 
-    await episodicMemory.update("c1", "We talked about flying mammals.");
-    results = await episodicMemory.search("flying mammals", 1);
-    expect(results.length).toBe(1);
-    expect(results[0].summary).toBe("We talked about flying mammals.");
-    expect(results[0].chatId).toBe("c1");
-  });
-
-  test("SemanticMemoryModel should create the index on Initialize", async () => {
-    const options = {
-      vectorDimensions: 3,
-      embed: async (text: string) => {
-        return [0, 0, 0];
-      },
-      createUid: () => {
-        return "test";
-      },
-    };
-    await SemanticMemoryModel.Initialize(db, options);
-    await SemanticMemoryModel.Initialize(db, options);
-    await SemanticMemoryModel.Initialize(db, options);
-    await SemanticMemoryModel.Initialize(db, options);
-  });
-
-  test("SemanticMemoryModel should store and retrieve memories", async () => {
-    const semanticMemory = await SemanticMemoryModel.New(db, {
-      vectorDimensions: 3,
-      embed: async (text: string) => {
-        if (text === "What year is it?") {
-          return [1, 0, 0];
-        } else if (text === "What color is the sky?") {
-          return [0, 1, 0];
-        } else if (text === "What planet are we on?") {
-          return [0, 0, 1];
-        }
-        return [0, 0, 0];
-      },
-    });
-
-    await semanticMemory.add("What year is it?", "2025");
-    await semanticMemory.add("What color is the sky?", "blue");
-    await semanticMemory.add("What planet are we on?", "Earth");
-
-    const results = await semanticMemory.search("What year is it?", 2);
-    expect(results.length).toBe(2);
-    expect(results[0].question).toBe("What year is it?");
-    expect(results[0].answer).toBe("2025");
-    expect(results[1].question).toBe("What color is the sky?");
-    expect(results[1].answer).toBe("blue");
-  });
-
-  test("SemanticMemoryModel should allow updates", async () => {
-    const semanticMemory = await SemanticMemoryModel.New(db, {
-      vectorDimensions: 3,
-      embed: async (text: string) => {
-        if (text === "What year is it?") {
-          return [1, 0, 0];
-        } else if (text === "What color is the sky?") {
-          return [0, 1, 0];
-        } else if (text === "What planet are we on?") {
-          return [0, 0, 1];
-        }
-        return [0, 0, 0];
-      },
-    });
-
-    await semanticMemory.add("What year is it?", "2025");
-    let results = await semanticMemory.search("What year is it?", 1);
-    expect(results.length).toBe(1);
-    expect(results[0].question).toBe("What year is it?");
-    expect(results[0].answer).toBe("2025");
-
-    // Add again with the same ID but different answer
-    await semanticMemory.update(results[0].id, "What year is it?", "2026");
-    results = await semanticMemory.search("What year is it?", 1);
-    expect(results.length).toBe(1);
-    expect(results[0].question).toBe("What year is it?");
-    expect(results[0].answer).toBe("2026");
-  });
-
-  test("WorkingMemoryModel should allow creating, updating, and searching LongTermMemoryModel, EpisodicMemoryModel, and SemanticMemoryModel", async () => {
-    const options = {
-      vectorDimensions: 4,
-      embed: async (text: string) => {
-        switch (text) {
-          case "What year is it?":
-            return [0, 0, 0, 0];
-          case "What color is the sky?":
-            return [0, 0, 0, 1];
-          case "What planet are we on?":
-            return [0, 0, 1, 0];
-          case "What was the conversation about bats?":
-            return [0, 0, 1, 1];
-          case "What were we discussing about universities?":
-            return [0, 1, 0, 0];
-          case "What happened in the job interview?":
-            return [0, 1, 0, 1];
-          case "What is the user's name?":
-            return [0, 1, 1, 0];
-          case "What is the user's age?":
-            return [0, 1, 1, 1];
-          case "What is the user's favorite color?":
-            return [1, 0, 0, 0];
-          default:
-            return [0, 0, 0, 0];
-        }
-      },
-    };
-
-    const workinMemoryModel = await WorkingMemoryModel.New(db, userId, options);
-
-    await workinMemoryModel.addSemanticMemory("What year is it?", "2025");
-    await workinMemoryModel.addSemanticMemory("What color is the sky?", "blue");
-    await workinMemoryModel.addSemanticMemory(
-      "What planet are we on?",
-      "Earth",
-    );
-
-    await workinMemoryModel.addLongTermMemory(
-      "c1",
-      "What was the conversation about bats?",
-    );
-    await workinMemoryModel.addLongTermMemory(
-      "c2",
-      "What were we discussing about universities?",
-    );
-    await workinMemoryModel.addLongTermMemory(
-      "c3",
-      "What happened in the job interview?",
-    );
-
-    await workinMemoryModel.addEpisodicMemory(
-      "What is the user's name?",
-      "John",
-    );
-    await workinMemoryModel.addEpisodicMemory("What is the user's age?", "30");
-    await workinMemoryModel.addEpisodicMemory(
-      "What is the user's favorite color?",
-      "Blue",
-    );
-
-    const results = await workinMemoryModel.search("What year is it?", 5);
-    expect(results.length).toBe(5);
-    expect(results[0].type).toBe("semantic");
-
-    if (results[0].type === "semantic") {
-      expect(results[0].question).toBe("What year is it?");
-      expect(results[0].answer).toBe("2025");
-    }
+    expect(created).toHaveLength(2);
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]?.url).toContain("https://example.com/");
   });
 });

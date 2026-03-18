@@ -34,9 +34,9 @@ const config = {
       process.env.OPENAI_EMBEDDINGS_DIMENSIONS ?? "1536",
       10,
     ),
-    LARGE_CHAT_MODEL: process.env.OPENAI_LARGE_CHAT_MODEL || "gpt-5",
-    MEDIUM_CHAT_MODEL: process.env.OPENAI_MEDIUM_CHAT_MODEL || "gpt-5-mini",
-    SMALL_CHAT_MODEL: process.env.OPENAI_SMALL_CHAT_MODEL || "gpt-5-nano",
+    LARGE_CHAT_MODEL: process.env.OPENAI_LARGE_CHAT_MODEL || "gpt-5.4",
+    MEDIUM_CHAT_MODEL: process.env.OPENAI_MEDIUM_CHAT_MODEL || "gpt-5.4-mini",
+    SMALL_CHAT_MODEL: process.env.OPENAI_SMALL_CHAT_MODEL || "gpt-5.4-nano",
   },
   google: {
     CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || "",
@@ -68,6 +68,10 @@ const config = {
     SEMANTIC_MEMORY_PREFIX:
       process.env.REDIS_SEMANTIC_MEMORY_PREFIX || "semantic_memory:",
     MESSAGE_PREFIX: process.env.REDIS_MESSAGE_PREFIX || "message:",
+  },
+  crawl: {
+    SOURCE: process.env.CRAWL_SOURCE || "local",
+    LOCAL_LIMIT: Number(process.env.CRAWL_LOCAL_LIMIT || "5"),
   },
   tavily: {
     API_KEY: process.env.TAVILY_API_KEY || "",

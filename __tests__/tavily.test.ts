@@ -1,29 +1,66 @@
-import { afterAll, beforeEach, describe, test, mock, expect } from "bun:test";
-import fs from "fs/promises";
-import * as tavily from "../server/services/tavily/tavily";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-describe.only("Tavily Service", () => {
-  const testUrl =
-    "https://redis.io/learn/what-is-agent-memory-example-using-lang-graph-and-redis";
+const extractMock = mock(
+  async (urls: string[], _options: { format: string }) => {
+    return {
+      results: urls.map((url) => ({
+        url,
+        rawContent: `content for ${url}`,
+      })),
+    };
+  },
+);
 
-  test("should extract content from a URL", async () => {
-    const { results } = await tavily.extract(testUrl);
+const crawlMock = mock(
+  async (
+    url: string,
+    options: { instructions: string; format: string; limit: number },
+  ) => {
+    return {
+      results: [
+        {
+          url,
+          rawContent: `crawled with ${options.instructions}`,
+        },
+      ],
+    };
+  },
+);
 
-    expect(results).toBeDefined();
-    expect(results.length).toBeGreaterThan(0);
+mock.module("@tavily/core", () => ({
+  tavily: () => ({
+    extract: extractMock,
+    crawl: crawlMock,
+  }),
+}));
 
-    await fs.writeFile("./extracted.md", results[0].rawContent);
+describe("Tavily service", () => {
+  beforeEach(() => {
+    extractMock.mockClear();
+    crawlMock.mockClear();
+    process.env.TAVILY_API_KEY = "test-key";
   });
 
-  test.only("should fetch tutorials from Tavily docs", async () => {
-    const { results } = await tavily.crawl(testUrl);
-    expect(results).toBeDefined();
+  test("extract chunks URL batches larger than 20 items", async () => {
+    const tavily = await import("../server/services/tavily/tavily");
+    const urls = Array.from({ length: 25 }, (_, index) => {
+      return `https://example.com/${index}`;
+    });
 
-    for (const res of results) {
-      await fs.writeFile(
-        `./docs/${res.url.replace(/\https:\/\/redis.io\//, "").replace(/\//g, "_")}.md`,
-        res.rawContent,
-      );
-    }
+    const response = await tavily.extract(urls);
+
+    expect(extractMock).toHaveBeenCalledTimes(2);
+    expect(response.results).toHaveLength(25);
+  });
+
+  test("crawl forwards instructions to Tavily", async () => {
+    const tavily = await import("../server/services/tavily/tavily");
+    const results = await tavily.crawl(
+      "https://example.com/docs",
+      "Find tutorial pages.",
+    );
+
+    expect(crawlMock).toHaveBeenCalledTimes(1);
+    expect(results[0]?.rawContent).toContain("Find tutorial pages.");
   });
 });

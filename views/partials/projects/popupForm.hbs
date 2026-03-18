@@ -1,8 +1,8 @@
 <div hx-swap-oob="innerHTML:#popupContainer">
 {{#if show}}
-<div class="fixed inset-0 w-full bg-gray-950/60 flex justify-center items-center z-50" id="formPopup">
-  <div class="bg-gray-800 p-4 rounded-lg shadow-lg w-11/12 max-w-xl">
-    <h2 class="text-md font-semibold mb-4 text-gray-100">
+<div class="fixed inset-0 w-full bg-midnight/60 flex justify-center items-center z-50" id="formPopup">
+  <div class="bg-dusk-09 p-4 rounded-lg shadow-lg w-11/12 max-w-xl border border-dusk">
+    <h2 class="text-sm font-semibold mb-4 text-white">
         {{label}}
     </h2>
     <form ws-send hx-disabled-elt="this" class="flex flex-col">
@@ -10,13 +10,13 @@
       {{#if id}}
       <input type="hidden" name="id" value="{{id}}">
       {{/if}}
-      <textarea name="content" rows="10" placeholder="Enter your content here..." class="w-full min-h-[150px] mb-4 p-2 border border-gray-600 rounded resize-y bg-gray-700 text-gray-100 placeholder-gray-400">{{content}}</textarea>
+      <textarea name="content" rows="10" placeholder="Enter your content here..." class="w-full min-h-[150px] mb-4 p-2 border border-dusk-50 rounded resize-y bg-dusk-90 text-white placeholder-dusk-50"></textarea>
       <div class="flex justify-end gap-2">
-        <button type="submit" name="action" value="apply_all" class="py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700">Apply All</button>
+        <button type="submit" name="action" value="apply_all" class="btn-primary">Apply All</button>
         {{#if id}}
-        <button type="submit" name="action" value="apply" class="py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700">Apply</button>
+        <button type="submit" name="action" value="apply" class="btn-primary">Apply</button>
         {{/if}}
-        <button type="submit" name="action" value="cancel" class="py-2 px-4 bg-gray-700 border border-gray-600 rounded text-gray-100 hover:bg-gray-600">Cancel</button>
+        <button type="submit" name="action" value="cancel" class="btn-secondary">Cancel</button>
       </div>
     </form>
   </div>

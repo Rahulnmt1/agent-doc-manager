@@ -1,7 +1,6 @@
 name: "redis-document-agent"
 services:
   redis:
-    container_name: redis
     image: "redis:alpine"
     ports:
       - 6300:6379
@@ -13,13 +12,20 @@ services:
       - redis-data:/data
 
   server:
-    container_name: server
     build: .
     ports:
       - 8080:8080
-    env_file:
-      - ./.env
-      - ./.env.docker
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      REDIS_URL: redis://redis:6379
+      CRAWL_SOURCE: ${CRAWL_SOURCE:-local}
+      CRAWL_LOCAL_LIMIT: ${CRAWL_LOCAL_LIMIT:-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      GOOGLE_CLOUD_PROJECT_ID: ${GOOGLE_CLOUD_PROJECT_ID:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
     restart: unless-stopped
     depends_on:
       - redis

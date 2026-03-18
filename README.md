@@ -1,100 +1,116 @@
-This is a [Redis](https://redis.io/) LLM chatbot for JS and [Node](https://nodejs.org/) using:
+# Redis document agent
 
-- [Redis Cloud](https://redis.io/try-free/)
-- [Express](https://expressjs.com/)
+This app is a Bun + Express document agent that uses Redis for:
+
+- Session storage
+- Short-term chat history
+- Long-term, episodic, and semantic memory
+- JSON document storage
+- Vector search over document chunks
+- Redis Streams-backed logging
+
+By default, the app runs in a deterministic local demo mode that loads bundled markdown docs from `data/documents` into Redis. You can optionally switch to live crawl mode with Tavily.
 
 ## Requirements
 
-- [bun](https://bun.sh/)
-- [docker](https://www.docker.com/)
-  - Optional
+- [Bun](https://bun.sh/)
+- [Docker](https://www.docker.com/) for the bundled Redis service
+- One LLM provider key
+  - Recommended: OpenAI
+  - Optional: Google Vertex AI or Anthropic
 
-## Getting started
+## Quick start
 
-Copy and edit the `.env` file:
+1. Create a local env file:
 
 ```bash
 cp .env.example .env
 ```
 
-Your `.env` file should contain the connection string you copied from Redis Cloud.
-
-Next, spin up docker containers:
-
-```bash
-bun docker
-```
-
-> **NOTE:** If you only want to run Redis in docker and then run the app in dev mode, use `bun docker:redis` instead.
-
-You should have a server running on `http://localhost:<port>` where the port is set in your `.env` file (default is 8080). Go to that URL in your browser and you should see the chat.
-
-## Running tests
-
-There are some tests in the `__tests__` folder that can be run with the following command:
-
-```bash
-bun test --timeout 15000
-```
-
-These tests setup and teardown on their own. You can modify them if you want to leave data in Redis.
-
-## Running locally outside docker
-
-To run the development server outside of docker:
+2. Install dependencies:
 
 ```bash
 bun install
-# then, only if you want to run Redis in docker
-bun docker:redis
-# finally
-bun dev
 ```
 
-## Other Scripts
-
-Formatting code:
+3. Start Redis in Docker:
 
 ```bash
-bun format
+bun run docker:redis
 ```
 
-Updating dependencies:
+4. Start the app:
 
 ```bash
-bun update
+bun run dev
 ```
 
-This is a no-build JavaScript project, but you can still run type checking:
+Open `http://localhost:8080`.
+
+## Demo modes
+
+### Local demo mode
+
+This is the default mode.
+
+- `CRAWL_SOURCE=local`
+- The app loads bundled docs from `data/documents`
+- No Tavily key is required
+- Best fit for the tutorial flow and local testing
+
+### Live crawl mode
+
+Switch to Tavily-backed crawl when you want live document ingestion.
 
 ```bash
-bun ts
+CRAWL_SOURCE=tavily
+TAVILY_API_KEY=...
 ```
 
-## Connecting to Redis Cloud
+In live crawl mode, the app uses the URL and crawl instructions extracted from the project prompt.
 
-If you don't yet have a database setup in Redis Cloud [get started here for free](https://redis.io/try-free/).
-
-To connect to a Redis Cloud database, log into the console and find the following:
-
-1. The `public endpoint` (looks like `redis-#####.c###.us-east-1-#.ec2.redns.redis-cloud.com:#####`)
-1. Your `username` (`default` is the default username, otherwise find the one you setup)
-1. Your `password` (either setup through Data Access Control, or available in the `Security` section of the database
-   page.
-
-Combine the above values into a connection string and put it in your `.env` and `.env.docker` accordingly. It should
-look something like the following:
+## Scripts
 
 ```bash
-REDIS_URL="redis://default:<password>@redis-#####.c###.us-west-2-#.ec2.redns.redis-cloud.com:#####"
+bun run dev         # app + CSS watcher
+bun run test        # test suite
+bun run ts          # TypeScript checks
+bun run build       # production build
+bun run format      # Prettier
+bun run docker      # Redis + app in Docker
+bun run docker:redis
 ```
 
-Run the [tests](#running-tests) to verify that you are connected properly.
+## Redis setup
+
+The bundled Docker setup uses:
+
+- `redis:alpine`
+- Port `6300` on the host
+- `redis://redis:6379` inside Compose
+
+For local development outside Docker, the app reads `REDIS_URL` from `.env`.
+
+## Redis Cloud
+
+You can also point the app at Redis Cloud by setting `REDIS_URL` to your Redis Cloud connection string.
+
+Example:
+
+```bash
+REDIS_URL="redis://default:<password>@redis-xxxxx.region.provider.redns.redis-cloud.com:12345"
+```
+
+## What the app does
+
+1. Create a project and provide a title plus a working brief.
+2. Load source docs into Redis.
+3. Chunk and embed those docs for vector search.
+4. Ask questions over the indexed docs.
+5. Edit markdown and reuse editing preferences through Redis-backed memory.
 
 ## Learn more
 
-To learn more about Redis, take a look at the following resources:
-
-- [Redis Documentation](https://redis.io/docs/latest/) - learn about Redis products, features, and commands.
-- [Learn Redis](https://redis.io/learn/) - read tutorials, quick starts, and how-to guides for Redis.
-- [Redis Demo Center](https://redis.io/demo-center/) - watch short, technical videos about Redis products and features.
+- [Redis docs](https://redis.io/docs/latest/)
+- [Redis tutorials](https://redis.io/tutorials/)
+- [Redis Cloud](https://redis.io/try-free/)

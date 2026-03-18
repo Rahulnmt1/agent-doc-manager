@@ -26,7 +26,7 @@ COPY . .
 FROM base AS prerelease
 COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
-RUN bun deploy:css && bun deploy:build
+RUN bun run build
 
 # copy production dependencies and source code into final image
 FROM base AS release

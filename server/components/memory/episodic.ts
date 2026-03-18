@@ -191,7 +191,7 @@ export class EpisodicMemoryModel {
     );
 
     if (dbModel.total === 0) {
-      return this.add(summary, chatId, ttl);
+      return this.add(chatId, summary, ttl);
     }
 
     const { id } = dbModel.documents[0];

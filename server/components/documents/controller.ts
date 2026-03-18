@@ -6,7 +6,11 @@ import {
 } from "redis";
 import config from "../../config";
 import getClient from "../../redis";
-import { llm, embedText } from "../../services/ai/ai";
+import {
+  embedText,
+  getEmbeddingDimensions,
+  hasConfiguredLlm,
+} from "../../services/ai/ai";
 import { randomUlid } from "../../utils/uid";
 import * as ai from "./ai";
 import * as tools from "./tools";
@@ -38,16 +42,27 @@ export interface DocumentChunk {
 }
 
 export async function initialize() {
+  if (!hasConfiguredLlm()) {
+    logger.warn(
+      "Skipping document index initialization because no LLM provider is configured.",
+      {
+        noStream: true,
+      },
+    );
+    return;
+  }
+
   await createIndexIfNotExists();
 }
 
 export async function createIndexIfNotExists() {
+  const vectorDimensions = getEmbeddingDimensions();
   const chunkSchema: RediSearchSchema = {
     "$.embedding": {
       type: SCHEMA_FIELD_TYPE.VECTOR,
       TYPE: "FLOAT32",
       ALGORITHM: SCHEMA_VECTOR_FIELD_ALGORITHM.HNSW,
-      DIM: llm.dimensions,
+      DIM: vectorDimensions,
       DISTANCE_METRIC: "COSINE",
       AS: "embedding",
     },
@@ -231,9 +246,7 @@ export async function create(
   url: string,
   content: string,
 ): Promise<Document> {
-  const documents = await createMany(userId, projectId, [
-    { url: urlToBase64(url), content },
-  ]);
+  const documents = await createMany(userId, projectId, [{ url, content }]);
 
   return documents[0];
 }

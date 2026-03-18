@@ -1,5 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
+import config from "../../config";
+import logger from "../../utils/log";
 import * as tavily from "../../services/tavily/tavily";
 import { ctrl as documents } from "../documents";
 import urls from "./urls";
@@ -59,24 +61,43 @@ async function crawlWithUrlsAndSave(userId: string, projectId: string) {
   return newDocuments;
 }
 
+async function crawlWithTavily(
+  userId: string,
+  projectId: string,
+  url: string,
+  instructions: string,
+) {
+  const pages = await tavily.crawl(url, instructions);
+
+  return documents.createMany(
+    userId,
+    projectId,
+    pages.map((page) => ({
+      url: page.url,
+      content: page.rawContent,
+    })),
+  );
+}
+
 export async function crawlUrl(
   userId: string,
   projectId: string,
   url: string,
   instructions: string,
 ) {
-  return await crawlLocalDocuments(userId, projectId, 5);
+  if (config.crawl.SOURCE === "tavily") {
+    logger.info("Running live crawl mode with Tavily", {
+      userId,
+      projectId,
+      url,
+    });
+    return crawlWithTavily(userId, projectId, url, instructions);
+  }
 
-  // const pages = await tavily.crawl(url, instructions);
-
-  // const newDocuments = await documents.createMany(
-  //   userId,
-  //   projectId,
-  //   pages.map((f) => ({
-  //     url: f.url,
-  //     content: f.rawContent,
-  //   })),
-  // );
-
-  // return newDocuments;
+  logger.info("Running local demo crawl mode with bundled docs", {
+    userId,
+    projectId,
+    localLimit: config.crawl.LOCAL_LIMIT,
+  });
+  return crawlLocalDocuments(userId, projectId, config.crawl.LOCAL_LIMIT);
 }

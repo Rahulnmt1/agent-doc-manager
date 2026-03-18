@@ -1,6 +1,6 @@
 import { generateText, stepCountIs } from "ai";
 import type { Tool } from "ai";
-import { llm } from "../../services/ai/ai";
+import { getLlm } from "../../services/ai/ai";
 import type { ShortTermMemory, Tools } from "../../components/memory";
 import type { Command } from "../parser";
 import type { DocumentChunk } from "../documents";
@@ -10,6 +10,7 @@ export async function answerPrompt(
   messages: ShortTermMemory[],
   tools: Tools,
 ): Promise<string> {
+  const llm = getLlm();
   const { addMemoryTool, searchTool, updateMemoryTool } = tools.getTools();
 
   const response = await generateText({
@@ -63,6 +64,7 @@ export async function answerQuestionWithRag(
   documentChunks: DocumentChunk[],
   documentChunkSearchTool: Tool & { name: string },
 ) {
+  const llm = getLlm();
   const response = await generateText({
     model: llm.largeModel,
     messages: [
@@ -105,6 +107,7 @@ export async function storeSemanticMemories(
   response: string,
   tools: Tools,
 ) {
+  const llm = getLlm();
   const { addSemanticMemoryTool } = tools.getTools();
 
   await generateText({

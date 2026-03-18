@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { llm } from "../../services/ai/ai";
+import { getLlm } from "../../services/ai/ai";
 import { generateObject, generateText } from "ai";
 import { ShortTermMemory } from "../memory";
 
@@ -23,6 +23,7 @@ export type UrlAndInstructions = z.infer<typeof UrlAndInstructionsSchema>;
 export async function getUrlAndInstructions(
   prompt: string,
 ): Promise<UrlAndInstructions> {
+  const llm = getLlm();
   const response = await generateObject({
     model: llm.smallModel,
     messages: [
@@ -81,6 +82,7 @@ const CommandSchema = z.object({
 export type Command = z.infer<typeof CommandSchema>;
 
 export async function getCommand(messages: ShortTermMemory[]) {
+  const llm = getLlm();
   const response = await generateObject({
     model: llm.smallModel,
     messages: [
@@ -145,6 +147,7 @@ export async function getCommand(messages: ShortTermMemory[]) {
 }
 
 export async function mergeText(text: string[]) {
+  const llm = getLlm();
   const response = await generateText({
     model: llm.mediumModel,
     messages: [

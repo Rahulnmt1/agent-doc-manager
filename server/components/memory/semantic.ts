@@ -183,6 +183,7 @@ export class SemanticMemoryModel {
     }
 
     await this.db.json.set(key, "$", {
+      id,
       question,
       answer,
       embedding,

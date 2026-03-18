@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { llm } from "../../services/ai/ai";
+import { getLlm } from "../../services/ai/ai";
 import { generateObject } from "ai";
 
 const ChunkedFileSchema = z.object({
@@ -13,6 +13,7 @@ export async function modifyContent(
   prompt: string,
   url: string,
 ) {
+  const llm = getLlm();
   const ModificationSchema = z.object({
     modifiedContent: z.string(),
   });
@@ -64,6 +65,7 @@ export async function matchPromptToUrl(prompt: string, urls: string[]) {
     return "";
   }
 
+  const llm = getLlm();
   const UrlMatchSchema = z.object({
     matchedUrl: z
       .string()
@@ -106,6 +108,7 @@ export async function matchPromptToUrl(prompt: string, urls: string[]) {
 }
 
 export async function chunkFile(content: string, maxChunkSize: number = 1000) {
+  const llm = getLlm();
   const response = await generateObject({
     model: llm.smallModel,
     messages: [
@@ -152,6 +155,7 @@ export async function getDiffSummary(
   newText: string,
   url: string,
 ) {
+  const llm = getLlm();
   const response = await generateObject({
     model: llm.largeModel,
     messages: [

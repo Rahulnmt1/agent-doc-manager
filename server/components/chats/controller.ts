@@ -1,6 +1,6 @@
 import getClient from "../../redis";
 import config from "../../config";
-import { llm, embedText } from "../../services/ai/ai";
+import { embedText, getEmbeddingDimensions } from "../../services/ai/ai";
 import { randomUlid } from "../../utils/uid";
 import logger from "../../utils/log";
 import * as view from "./view";
@@ -9,12 +9,43 @@ import type { ShortTermMemory } from "../memory";
 import * as ai from "./ai";
 import { ctrl as documents } from "../documents";
 
+interface ChatAiAdapter {
+  answerQuestionWithRag(
+    session: ShortTermMemory[],
+    documentChunks: Awaited<ReturnType<typeof documents.searchChunks>>,
+    documentChunkSearchTool: Awaited<
+      ReturnType<typeof documents.getChunkSearchTool>
+    >,
+  ): Promise<string>;
+  storeSemanticMemories(
+    query: string,
+    response: string,
+    tools: Awaited<ReturnType<typeof getTools>>,
+  ): Promise<void>;
+}
+
+const defaultChatAiAdapter: ChatAiAdapter = {
+  answerQuestionWithRag: ai.answerQuestionWithRag,
+  storeSemanticMemories: ai.storeSemanticMemories,
+};
+
+let chatAiAdapter: ChatAiAdapter = defaultChatAiAdapter;
+
+export function setChatAiAdapterForTests(nextAdapter?: Partial<ChatAiAdapter>) {
+  chatAiAdapter = nextAdapter
+    ? {
+        ...defaultChatAiAdapter,
+        ...nextAdapter,
+      }
+    : defaultChatAiAdapter;
+}
+
 async function getWorkingMemory(userId: string) {
   const redis = await getClient();
 
   return WorkingMemoryModel.New(redis, userId, {
     createUid: () => randomUlid(),
-    vectorDimensions: llm.dimensions,
+    vectorDimensions: getEmbeddingDimensions(),
     embed: embedText,
     ttl: config.redis.DEFAULT_TTL,
   });
@@ -113,13 +144,17 @@ export async function newChatMessage(
     const memoryTools = await getTools(userId);
     const chunkSearchTool = await documents.getChunkSearchTool(userId);
 
-    response.content = await ai.answerQuestionWithRag(
+    response.content = await chatAiAdapter.answerQuestionWithRag(
       await chat.memories(),
       documentChunks,
       chunkSearchTool,
     );
 
-    await ai.storeSemanticMemories(message, response.content, memoryTools);
+    await chatAiAdapter.storeSemanticMemories(
+      message,
+      response.content,
+      memoryTools,
+    );
   }
 
   response = await chat.push(response);
